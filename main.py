@@ -300,7 +300,7 @@ def run_full_analysis(
         query_id = uuid.uuid4().hex
         pipeline = StockAnalysisPipeline(
             config=config,
-            max_workers=args.workers,
+            max_workers=1,
             query_id=query_id,
             query_source="cli",
             save_context_snapshot=save_context_snapshot
