@@ -79,6 +79,8 @@ class Config:
     gemini_request_delay: float = 2.0  # 请求间隔（秒）
     gemini_max_retries: int = 5  # 最大重试次数
     gemini_retry_delay: float = 5.0  # 重试基础延时（秒）
+    llm_rate_limit_retry_delay: float = 30.0  # RateLimitError 时等待秒数（429 限流需较长冷却）
+    llm_rate_limit_max_retries: int = 2  # RateLimitError 时同模型最大重试次数
 
     # Anthropic Claude API（备选，当 Gemini 不可用时使用）
     anthropic_api_key: Optional[str] = None
@@ -465,6 +467,8 @@ class Config:
             gemini_request_delay=float(os.getenv('GEMINI_REQUEST_DELAY', '2.0')),
             gemini_max_retries=int(os.getenv('GEMINI_MAX_RETRIES', '5')),
             gemini_retry_delay=float(os.getenv('GEMINI_RETRY_DELAY', '5.0')),
+            llm_rate_limit_retry_delay=float(os.getenv('LLM_RATE_LIMIT_RETRY_DELAY', '30.0')),
+            llm_rate_limit_max_retries=int(os.getenv('LLM_RATE_LIMIT_MAX_RETRIES', '2')),
             anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
             anthropic_model=os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'),
             anthropic_temperature=float(os.getenv('ANTHROPIC_TEMPERATURE', '0.7')),
