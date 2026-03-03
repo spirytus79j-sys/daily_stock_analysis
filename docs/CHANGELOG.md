@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- 🐛 **LiteLLM RateLimitError 429 限流** — 遇到 `litellm.RateLimitError` 时自动等待并重试，新增 `LLM_RATE_LIMIT_RETRY_DELAY`、`LLM_RATE_LIMIT_MAX_RETRIES` 配置
 - 🐛 **AstrBot sender docstring misplaced** — `import time` placed before docstring in `_send_astrbot`, causing it to become dead code
 - 🐛 **Telegram Markdown link escaping** — `_convert_to_telegram_markdown` escaped `[]()` characters, breaking all Markdown links in reports
 - 🐛 **Duplicate `discord_bot_status` field** in Config dataclass — second declaration silently shadowed the first
