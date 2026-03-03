@@ -8,6 +8,7 @@ interface consumed by the AgentExecutor, via LiteLLM.
 
 import json
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -208,13 +209,28 @@ class LLMToolAdapter:
         models_to_try = [m for m in models_to_try if m]
 
         last_error = None
+        rate_limit_delay = config.llm_rate_limit_retry_delay
+        rate_limit_max_retries = config.llm_rate_limit_max_retries
+
         for model in models_to_try:
-            try:
-                return self._call_litellm_model(messages, tools, model)
-            except Exception as e:
-                logger.warning(f"Agent LLM call failed with {model}: {e}")
-                last_error = e
-                continue
+            retry_count = 0
+            while retry_count <= rate_limit_max_retries:
+                try:
+                    return self._call_litellm_model(messages, tools, model)
+                except Exception as e:
+                    is_rate_limit = type(e).__name__ == "RateLimitError"
+                    if is_rate_limit and retry_count < rate_limit_max_retries:
+                        retry_count += 1
+                        wait_sec = getattr(e, "retry_after", None)
+                        delay = float(wait_sec) if wait_sec is not None and isinstance(wait_sec, (int, float)) else rate_limit_delay
+                        logger.warning(
+                            f"Agent LLM {model} RateLimitError, 等待 {delay:.0f}s 后重试 ({retry_count}/{rate_limit_max_retries}): {e}"
+                        )
+                        time.sleep(delay)
+                    else:
+                        logger.warning(f"Agent LLM call failed with {model}: {e}")
+                        last_error = e
+                        break
 
         error_msg = f"All LLM models failed. Last error: {last_error}"
         logger.error(error_msg)
@@ -236,6 +252,7 @@ class LLMToolAdapter:
             "model": model,
             "messages": openai_messages,
             "temperature": self._get_temperature(model),
+            "num_retries": min(self._config.gemini_max_retries, 3),
         }
 
         extra = get_thinking_extra_body(model_short)
