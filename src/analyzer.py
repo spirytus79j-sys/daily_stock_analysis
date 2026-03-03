@@ -617,41 +617,61 @@ class GeminiAnalyzer:
         models_to_try = [m for m in models_to_try if m]
 
         last_error = None
+        rate_limit_delay = config.llm_rate_limit_retry_delay
+        rate_limit_max_retries = config.llm_rate_limit_max_retries
+
         for model in models_to_try:
             keys = self._get_api_keys_for_model(model, config)
             if not keys:
                 logger.debug(f"[LiteLLM] Skipping {model}: no API keys")
                 continue
-            try:
-                model_short = model.split("/")[-1] if "/" in model else model
-                call_kwargs: Dict[str, Any] = {
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": self.SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                }
-                extra = get_thinking_extra_body(model_short)
-                if extra:
-                    call_kwargs["extra_body"] = extra
 
-                if self._router and model == config.litellm_model:
-                    response = self._router.completion(**call_kwargs)
-                else:
-                    call_kwargs["api_key"] = keys[0]
-                    call_kwargs.update(self._extra_litellm_params(model, config))
-                    response = litellm.completion(**call_kwargs)
+            model_short = model.split("/")[-1] if "/" in model else model
+            call_kwargs: Dict[str, Any] = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "num_retries": min(config.gemini_max_retries, 3),
+            }
+            extra = get_thinking_extra_body(model_short)
+            if extra:
+                call_kwargs["extra_body"] = extra
 
-                if response and response.choices and response.choices[0].message.content:
-                    return response.choices[0].message.content
-                raise ValueError("LLM returned empty response")
+            retry_count = 0
+            while retry_count <= rate_limit_max_retries:
+                try:
+                    if self._router and model == config.litellm_model:
+                        response = self._router.completion(**call_kwargs)
+                    else:
+                        call_kwargs["api_key"] = keys[0]
+                        call_kwargs.update(self._extra_litellm_params(model, config))
+                        response = litellm.completion(**call_kwargs)
 
-            except Exception as e:
-                logger.warning(f"[LiteLLM] {model} failed: {e}")
-                last_error = e
-                continue
+                    if response and response.choices and response.choices[0].message.content:
+                        return response.choices[0].message.content
+                    raise ValueError("LLM returned empty response")
+
+                except Exception as e:
+                    is_rate_limit = type(e).__name__ == "RateLimitError"
+                    if is_rate_limit and retry_count < rate_limit_max_retries:
+                        retry_count += 1
+                        wait_sec = getattr(e, "retry_after", None)
+                        if wait_sec is not None and isinstance(wait_sec, (int, float)):
+                            delay = float(wait_sec)
+                        else:
+                            delay = rate_limit_delay
+                        logger.warning(
+                            f"[LiteLLM] {model} RateLimitError, 等待 {delay:.0f}s 后重试 ({retry_count}/{rate_limit_max_retries}): {e}"
+                        )
+                        time.sleep(delay)
+                    else:
+                        logger.warning(f"[LiteLLM] {model} failed: {e}")
+                        last_error = e
+                        break
 
         raise Exception(f"All LLM models failed (tried {len(models_to_try)} model(s)). Last error: {last_error}")
     
