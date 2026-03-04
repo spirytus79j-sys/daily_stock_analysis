@@ -281,6 +281,12 @@ def run_full_analysis(
             logger.info("今日休市股票已跳过: %s", skipped)
         stock_codes = filtered_codes
 
+        # 定时/自动运行：掐断源头，最多分析 N 只核心股票，节省 API 额度
+        if not getattr(args, 'stocks', None) and len(stock_codes) > getattr(config, 'stock_list_max', 5):
+            max_stocks = config.stock_list_max
+            stock_codes = stock_codes[:max_stocks]
+            logger.info(f"定时/自动运行：仅分析前 {max_stocks} 只核心股票（STOCK_LIST_MAX={max_stocks}）")
+
         # 命令行参数 --single-notify 覆盖配置（#55）
         if getattr(args, 'single_notify', False):
             config.single_stock_notify = True
