@@ -79,8 +79,10 @@ class Config:
     gemini_request_delay: float = 2.0  # 请求间隔（秒）
     gemini_max_retries: int = 5  # 最大重试次数
     gemini_retry_delay: float = 5.0  # 重试基础延时（秒）
-    llm_rate_limit_retry_delay: float = 30.0  # RateLimitError 时等待秒数（429 限流需较长冷却）
-    llm_rate_limit_max_retries: int = 2  # RateLimitError 时同模型最大重试次数
+    llm_rate_limit_retry_delay: float = 60.0  # RateLimitError 时等待秒数（429 限流强制 60s 冷却）
+    llm_rate_limit_max_retries: int = 3  # RateLimitError 时同模型最大重试次数
+    llm_inter_stock_delay: float = 15.0  # 每只股票分析完成后强制休眠秒数，再发起下一次 LLM 请求
+    stock_list_max: int = 5  # 定时/自动运行时最多分析的股票数量（掐断源头，节省额度）
 
     # Anthropic Claude API（备选，当 Gemini 不可用时使用）
     anthropic_api_key: Optional[str] = None
@@ -203,7 +205,7 @@ class Config:
     log_level: str = "INFO"  # 日志级别
     
     # === 系统配置 ===
-    max_workers: int = 3  # 低并发防封禁
+    max_workers: int = 1  # LLM 分析强制单线程排队，避免 API 限流
     debug: bool = False
     http_proxy: Optional[str] = None  # HTTP 代理 (例如: http://127.0.0.1:10809)
     https_proxy: Optional[str] = None # HTTPS 代理
@@ -467,8 +469,10 @@ class Config:
             gemini_request_delay=float(os.getenv('GEMINI_REQUEST_DELAY', '2.0')),
             gemini_max_retries=int(os.getenv('GEMINI_MAX_RETRIES', '5')),
             gemini_retry_delay=float(os.getenv('GEMINI_RETRY_DELAY', '5.0')),
-            llm_rate_limit_retry_delay=float(os.getenv('LLM_RATE_LIMIT_RETRY_DELAY', '30.0')),
-            llm_rate_limit_max_retries=int(os.getenv('LLM_RATE_LIMIT_MAX_RETRIES', '2')),
+            llm_rate_limit_retry_delay=float(os.getenv('LLM_RATE_LIMIT_RETRY_DELAY', '60.0')),
+            llm_rate_limit_max_retries=int(os.getenv('LLM_RATE_LIMIT_MAX_RETRIES', '3')),
+            llm_inter_stock_delay=float(os.getenv('LLM_INTER_STOCK_DELAY', '15.0')),
+            stock_list_max=int(os.getenv('STOCK_LIST_MAX', '5')),
             anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
             anthropic_model=os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'),
             anthropic_temperature=float(os.getenv('ANTHROPIC_TEMPERATURE', '0.7')),
@@ -543,7 +547,7 @@ class Config:
             backtest_neutral_band_pct=float(os.getenv('BACKTEST_NEUTRAL_BAND_PCT', '2.0')),
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
-            max_workers=int(os.getenv('MAX_WORKERS', '3')),
+            max_workers=int(os.getenv('MAX_WORKERS', '1')),
             debug=os.getenv('DEBUG', 'false').lower() == 'true',
             http_proxy=os.getenv('HTTP_PROXY'),
             https_proxy=os.getenv('HTTPS_PROXY'),
