@@ -67,9 +67,10 @@ class AnalysisService:
             # 获取配置
             config = get_config()
             
-            # 创建分析流水线
+            # 创建分析流水线（强制单线程，避免 API 限流）
             pipeline = StockAnalysisPipeline(
                 config=config,
+                max_workers=1,
                 query_id=query_id,
                 query_source="api"
             )
