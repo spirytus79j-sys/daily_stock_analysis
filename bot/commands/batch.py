@@ -103,10 +103,13 @@ class BatchCommand(BotCommand):
             from main import StockAnalysisPipeline
             
             config = get_config()
-            
+            # 掐断源头：Bot 批量分析也限制最多 N 只，节省 API 额度
+            stock_list = stock_list[:getattr(config, 'stock_list_max', 5)]
+
             # 创建分析管道
             pipeline = StockAnalysisPipeline(
                 config=config,
+                max_workers=1,
                 source_message=message,
                 query_id=uuid.uuid4().hex,
                 query_source="bot"
