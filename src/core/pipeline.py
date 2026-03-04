@@ -958,6 +958,12 @@ class StockAnalysisPipeline:
         if stock_codes is None:
             self.config.refresh_stock_list()
             stock_codes = self.config.stock_list
+
+        # 掐断源头：从配置获取时，最多分析 N 只核心股票
+        max_stocks = getattr(self.config, 'stock_list_max', 5)
+        if len(stock_codes) > max_stocks:
+            stock_codes = stock_codes[:max_stocks]
+            logger.info(f"仅分析前 {max_stocks} 只核心股票（STOCK_LIST_MAX={max_stocks}）")
         
         if not stock_codes:
             logger.error("未配置自选股列表，请在 .env 文件中设置 STOCK_LIST")
@@ -965,7 +971,7 @@ class StockAnalysisPipeline:
         
         logger.info(f"===== 开始分析 {len(stock_codes)} 只股票 =====")
         logger.info(f"股票列表: {', '.join(stock_codes)}")
-        logger.info(f"并发数: {self.max_workers}, 模式: {'仅获取数据' if dry_run else '完整分析'}")
+        logger.info(f"并发数: 1（LLM 单线程排队）, 模式: {'仅获取数据' if dry_run else '完整分析'}")
         
         # === 批量预取实时行情（优化：避免每只股票都触发全量拉取）===
         # 只有股票数量 >= 5 时才进行预取，少量股票直接逐个查询更高效
@@ -987,9 +993,8 @@ class StockAnalysisPipeline:
         
         results: List[AnalysisResult] = []
         
-        # 使用线程池并发处理
-        # 注意：max_workers 设置较低（默认3）以避免触发反爬
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        # 使用线程池：强制 max_workers=1，确保 LLM 分析绝对单线程排队，避免 API 限流
+        with ThreadPoolExecutor(max_workers=1) as executor:
             # 提交任务
             future_to_code = {
                 executor.submit(
@@ -1004,6 +1009,7 @@ class StockAnalysisPipeline:
             }
             
             # 收集结果
+            inter_stock_delay = getattr(self.config, 'llm_inter_stock_delay', 15.0)
             for idx, future in enumerate(as_completed(future_to_code)):
                 code = future_to_code[future]
                 try:
@@ -1011,14 +1017,10 @@ class StockAnalysisPipeline:
                     if result:
                         results.append(result)
 
-                    # Issue #128: 分析间隔 - 在个股分析和大盘分析之间添加延迟
-                    if idx < len(stock_codes) - 1 and analysis_delay > 0:
-                        # 注意：此 sleep 发生在“主线程收集 future 的循环”中，
-                        # 并不会阻止线程池中的任务同时发起网络请求。
-                        # 因此它对降低并发请求峰值的效果有限；真正的峰值主要由 max_workers 决定。
-                        # 该行为目前保留（按需求不改逻辑）。
-                        logger.debug(f"等待 {analysis_delay} 秒后继续下一只股票...")
-                        time.sleep(analysis_delay)
+                    # 每只股票分析完成后强制休眠，再发起下一次 LLM 请求（保底防限流）
+                    if idx < len(stock_codes) - 1 and inter_stock_delay > 0:
+                        logger.info(f"等待 {inter_stock_delay:.0f}s 后分析下一只股票（防 API 限流）...")
+                        time.sleep(inter_stock_delay)
 
                 except Exception as e:
                     logger.error(f"[{code}] 任务执行失败: {e}")
