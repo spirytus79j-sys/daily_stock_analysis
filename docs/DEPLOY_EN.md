@@ -193,7 +193,7 @@ journalctl -u stock-analyzer -f
 | Config Item | Default | Description |
 |--------|--------|------|
 | `SCHEDULE_ENABLED` | `false` | Enable scheduled tasks |
-| `SCHEDULE_TIME` | `18:00` | Daily execution time |
+| `SCHEDULE_TIME` | `16:00` | Daily execution time |
 | `MARKET_REVIEW_ENABLED` | `true` | Enable market review |
 | `TAVILY_API_KEYS` | - | News search (optional) |
 
@@ -395,21 +395,21 @@ git push
 
 ### Schedule Details
 
-Default configuration: **Monday to Friday, 18:00 Beijing Time** auto-execution
+Default configuration: **Monday to Friday, 16:00 Beijing Time** auto-execution
 
 Modify time: Edit cron expression in `.github/workflows/daily_analysis.yml`:
 
 ```yaml
 schedule:
-  - cron: '0 10 * * 1-5'  # UTC time, +8 = Beijing time
+  - cron: '0 8 * * 1-5'   # UTC time, +8 = Beijing time
 ```
 
 Common cron examples:
 | Expression | Description |
 |--------|------|
-| `'0 10 * * 1-5'` | Mon-Fri 18:00 (Beijing) |
+| `'0 8 * * 1-5'` | Mon-Fri 16:00 (Beijing) |
 | `'30 7 * * 1-5'` | Mon-Fri 15:30 (Beijing) |
-| `'0 10 * * *'` | Daily 18:00 (Beijing) |
+| `'0 8 * * *'` | Daily 16:00 (Beijing) |
 | `'0 2 * * 1-5'` | Mon-Fri 10:00 (Beijing) |
 
 ### Modify Watchlist

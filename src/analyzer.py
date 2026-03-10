@@ -595,6 +595,146 @@ class GeminiAnalyzer:
         """Check if LiteLLM is properly configured with at least one API key."""
         return self._router is not None or self._litellm_available
 
+    @staticmethod
+    def _is_rate_limit_error(exc: BaseException) -> bool:
+        checked: set[int] = set()
+        cur: Optional[BaseException] = exc
+        while cur is not None and id(cur) not in checked:
+            checked.add(id(cur))
+            if type(cur).__name__ == "RateLimitError":
+                return True
+            status_code = getattr(cur, "status_code", None) or getattr(cur, "http_status", None)
+            if status_code == 429:
+                return True
+            msg = str(cur).lower()
+            if "ratelimit" in msg or "rate limit" in msg or "429" in msg:
+                return True
+            cur = (
+                getattr(cur, "original_exception", None)
+                or getattr(cur, "__cause__", None)
+                or getattr(cur, "__context__", None)
+            )
+        return False
+
+    @staticmethod
+    def _clamp_score(value: Any, default: int = 50) -> int:
+        try:
+            score = int(float(value))
+        except Exception:
+            score = default
+        return max(0, min(100, score))
+
+    @staticmethod
+    def _infer_trend_prediction(score: int) -> str:
+        if score >= 70:
+            return "看多"
+        if score >= 60:
+            return "偏多"
+        if score >= 40:
+            return "震荡"
+        if score >= 30:
+            return "偏空"
+        return "看空"
+
+    @staticmethod
+    def _normalize_operation_advice(value: Any) -> str:
+        if not value:
+            return "持有"
+        v = str(value).strip()
+        mapping = {
+            "STRONG_BUY": "强烈买入",
+            "BUY": "买入",
+            "HOLD": "持有",
+            "WAIT": "观望",
+            "SELL": "卖出",
+            "STRONG_SELL": "强烈卖出",
+        }
+        return mapping.get(v, v)
+
+    @staticmethod
+    def _advice_to_decision_type(advice: str) -> str:
+        advice = (advice or "").strip()
+        if advice in ("强烈买入", "买入", "加仓"):
+            return "buy"
+        if advice in ("卖出", "强烈卖出"):
+            return "sell"
+        return "hold"
+
+    def _build_rule_based_fallback_result(
+        self,
+        context: Dict[str, Any],
+        code: str,
+        name: str,
+        *,
+        reason: str,
+        news_context: Optional[str],
+    ) -> AnalysisResult:
+        trend = context.get("trend_analysis") or {}
+        score = self._clamp_score(trend.get("signal_score"), default=50)
+        operation_advice = self._normalize_operation_advice(trend.get("buy_signal") or trend.get("operation_advice"))
+        trend_prediction = self._infer_trend_prediction(score)
+
+        trend_status = str(trend.get("trend_status") or "").strip()
+        ma_alignment = str(trend.get("ma_alignment") or "").strip()
+        volume_status = str(trend.get("volume_status") or "").strip()
+        macd_signal = str(trend.get("macd_signal") or "").strip()
+        rsi_signal = str(trend.get("rsi_signal") or "").strip()
+
+        bias_ma5 = trend.get("bias_ma5")
+        try:
+            bias_ma5_text = f"{float(bias_ma5):+.2f}%"
+        except Exception:
+            bias_ma5_text = "N/A"
+
+        reasons = trend.get("signal_reasons") or []
+        if isinstance(reasons, list):
+            key_points = "\n".join(f"- {r}" for r in reasons if r)[:2000]
+        else:
+            key_points = ""
+
+        risk_factors = trend.get("risk_factors") or []
+        if isinstance(risk_factors, list) and any(risk_factors):
+            risk_warning = "；".join(str(x) for x in risk_factors if x)[:500]
+        else:
+            risk_warning = "AI 请求触发限流，本次未进行完整消息面/深度分析，结论仅供参考。"
+
+        technical_parts = []
+        if trend_status:
+            technical_parts.append(f"趋势：{trend_status}")
+        if ma_alignment:
+            technical_parts.append(f"均线：{ma_alignment}")
+        if bias_ma5_text != "N/A":
+            technical_parts.append(f"乖离率(MA5)：{bias_ma5_text}")
+        if volume_status:
+            technical_parts.append(f"量能：{volume_status}")
+        if macd_signal:
+            technical_parts.append(f"MACD：{macd_signal}")
+        if rsi_signal:
+            technical_parts.append(f"RSI：{rsi_signal}")
+        technical_analysis = "；".join(technical_parts)
+
+        summary = f"{operation_advice}：{reason}（技术面信号 {score}/100）。"
+
+        result = AnalysisResult(
+            code=code,
+            name=name,
+            sentiment_score=score,
+            trend_prediction=trend_prediction,
+            operation_advice=operation_advice,
+            decision_type=self._advice_to_decision_type(operation_advice),
+            confidence_level="低",
+            technical_analysis=technical_analysis,
+            key_points=key_points,
+            analysis_summary=summary,
+            risk_warning=risk_warning,
+            search_performed=bool(news_context),
+            market_snapshot=self._build_market_snapshot(context),
+            data_sources="rule_based (llm_rate_limited)",
+            success=True,
+            error_message=None,
+        )
+        return result
+
     def _call_litellm(self, prompt: str, generation_config: dict) -> str:
         """Call LLM via litellm with fallback across configured models.
 
@@ -656,7 +796,7 @@ class GeminiAnalyzer:
                     raise ValueError("LLM returned empty response")
 
                 except Exception as e:
-                    is_rate_limit = type(e).__name__ == "RateLimitError"
+                    is_rate_limit = self._is_rate_limit_error(e)
                     if is_rate_limit and retry_count < rate_limit_max_retries:
                         retry_count += 1
                         wait_sec = getattr(e, "retry_after", None)
@@ -776,8 +916,18 @@ class GeminiAnalyzer:
             logger.info(f"[LLM解析] {name}({code}) 分析完成: {result.trend_prediction}, 评分 {result.sentiment_score}")
             
             return result
-            
+             
         except Exception as e:
+            if self._is_rate_limit_error(e):
+                logger.warning(f"AI 分析 {name}({code}) 触发限流，降级为规则分析: {e}")
+                return self._build_rule_based_fallback_result(
+                    context,
+                    code,
+                    name,
+                    reason="AI 请求触发限流",
+                    news_context=news_context,
+                )
+
             logger.error(f"AI 分析 {name}({code}) 失败: {e}")
             return AnalysisResult(
                 code=code,

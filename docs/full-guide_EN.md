@@ -132,7 +132,7 @@ To get started quickly, you need at minimum:
 
 ### 5. Done!
 
-Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
+Default schedule: Every weekday at **16:00 (Beijing Time)** automatic execution.
 
 ---
 
@@ -212,7 +212,7 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), us (US stocks), both | `cn` |
 | `SCHEDULE_ENABLED` | Enable scheduled tasks | `false` |
-| `SCHEDULE_TIME` | Scheduled execution time | `18:00` |
+| `SCHEDULE_TIME` | Scheduled execution time | `16:00` |
 | `LOG_DIR` | Log directory | `./logs` |
 
 ---
@@ -350,7 +350,7 @@ Edit `.github/workflows/daily_analysis.yml`:
 ```yaml
 schedule:
   # UTC time, Beijing time = UTC + 8
-  - cron: '0 10 * * 1-5'   # Monday to Friday 18:00 (Beijing Time)
+  - cron: '0 8 * * 1-5'   # Monday to Friday 16:00 (Beijing Time)
 ```
 
 Common time reference:
@@ -360,18 +360,18 @@ Common time reference:
 | 09:30 | `'30 1 * * 1-5'` |
 | 12:00 | `'0 4 * * 1-5'` |
 | 15:00 | `'0 7 * * 1-5'` |
-| 18:00 | `'0 10 * * 1-5'` |
+| 16:00 | `'0 8 * * 1-5'` |
 | 21:00 | `'0 13 * * 1-5'` |
 
 ### Local Scheduled Tasks
 
 ```bash
-# Start scheduled mode (default 18:00 execution)
+# Start scheduled mode (default 16:00 execution)
 python main.py --schedule
 
 # Or use crontab
 crontab -e
-# Add: 0 18 * * 1-5 cd /path/to/project && python main.py
+# Add: 0 16 * * 1-5 cd /path/to/project && python main.py
 ```
 
 ---

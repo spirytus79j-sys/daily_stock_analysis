@@ -147,7 +147,7 @@ Go to `Actions` tab → Click `I understand my workflows, go ahead and enable th
 #### 5. Done!
 
 The system will:
-- Run automatically at scheduled time (default: 18:00 Beijing Time)
+- Run automatically at scheduled time (default: 16:00 Beijing Time)
 - Send analysis reports to all configured channels
 - Save reports locally
 
@@ -206,7 +206,7 @@ TAVILY_API_KEYS=your_tavily_key
 # One-time analysis
 python main.py
 
-# Scheduled mode (runs daily at 18:00)
+# Scheduled mode (runs daily at 16:00)
 python main.py --schedule
 
 # Analyze specific stocks
@@ -374,7 +374,7 @@ SINGLE_STOCK_NOTIFY=true       # Push immediately after each stock analysis
 
 # === Schedule ===
 SCHEDULE_ENABLED=true          # Enable scheduled task
-SCHEDULE_TIME=18:00            # Daily run time (HH:MM, 24-hour format)
+SCHEDULE_TIME=16:00            # Daily run time (HH:MM, 24-hour format)
 MARKET_REVIEW_ENABLED=true     # Enable market review
 
 # === Data Source ===

@@ -479,7 +479,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
-        "default_value": "18:00",
+        "default_value": "16:00",
         "options": [],
         "validation": {"pattern": r"^([01]\d|2[0-3]):[0-5]\d$"},
         "display_order": 10,

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - 🐛 **LiteLLM RateLimitError 429 限流** — 遇到 `litellm.RateLimitError` 时自动等待 60s 并重试 3 次；LLM 分析强制单线程（max_workers=1）；每只股票分析后休眠 15s；定时/自动运行最多分析 5 只股票（`STOCK_LIST_MAX`）
+- 🐛 **LLM 限流降级兜底** — 当所有 LLM 模型在重试后仍然触发限流时，自动降级为规则化技术面分析，避免报告出现“分析过程出错”
 - 🐛 **AstrBot sender docstring misplaced** — `import time` placed before docstring in `_send_astrbot`, causing it to become dead code
 - 🐛 **Telegram Markdown link escaping** — `_convert_to_telegram_markdown` escaped `[]()` characters, breaking all Markdown links in reports
 - 🐛 **Duplicate `discord_bot_status` field** in Config dataclass — second declaration silently shadowed the first
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - ⚙️ **Auto-tag workflow defaults to NO tag** — only tags when commit message explicitly contains `#patch`, `#minor`, or `#major`
+- ⏰ **默认定时任务时间** — 从 18:00（北京时间）调整为 16:00（北京时间）
 
 ### Docs
 - 📝 Clarified GitHub Actions non-trading-day manual run controls (`TRADING_DAY_CHECK_ENABLED` + `force_run`) for Issue #461 / PR #466

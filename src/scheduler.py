@@ -15,7 +15,6 @@
 
 import logging
 import signal
-import sys
 import time
 import threading
 from datetime import datetime
@@ -63,7 +62,7 @@ class Scheduler:
     - 优雅退出
     """
     
-    def __init__(self, schedule_time: str = "18:00"):
+    def __init__(self, schedule_time: str = "16:00"):
         """
         初始化调度器
         
@@ -152,7 +151,7 @@ class Scheduler:
 
 def run_with_schedule(
     task: Callable,
-    schedule_time: str = "18:00",
+    schedule_time: str = "16:00",
     run_immediately: bool = True
 ):
     """

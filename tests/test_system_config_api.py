@@ -25,7 +25,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 [
                     "STOCK_LIST=600519,000001",
                     "GEMINI_API_KEY=secret-key-value",
-                    "SCHEDULE_TIME=18:00",
+                    "SCHEDULE_TIME=16:00",
                     "LOG_LEVEL=INFO",
                     "ADMIN_AUTH_ENABLED=false",
                 ]
